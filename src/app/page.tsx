@@ -1,50 +1,154 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { petrolPumps, getStats, getDistricts } from "@/lib/data";
+import {
+  petrolPumps,
+  getStats,
+  divisions,
+  districts,
+  upazilas,
+  thanas,
+  getStationsForArea,
+} from "@/lib/data";
 import PumpCard from "@/components/PumpCard";
 import StatCard from "@/components/StatCard";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { useLanguage } from "@/components/LanguageProvider";
+
+const metropolitanAreaNamesBn: Record<string, string> = {
+  "Dhaka Metropolitan Police": "ঢাকা মেট্রোপলিটন",
+  "Chattogram Metropolitan Police": "চট্টগ্রাম মেট্রোপলিটন",
+  "Khulna Metropolitan Police": "খুলনা মেট্রোপলিটন",
+  "Rajshahi Metropolitan Police": "রাজশাহী মেট্রোপলিটন",
+  "Sylhet Metropolitan Police": "সিলেট মেট্রোপলিটন",
+  "Barishal Metropolitan Police": "বরিশাল মেট্রোপলিটন",
+  "Rangpur Metropolitan Police": "রংপুর মেট্রোপলিটন",
+  "Gazipur Metropolitan Police": "গাজীপুর মেট্রোপলিটন",
+};
 
 export default function Home() {
   const [search, setSearch] = useState("");
-  const [selectedDistrict, setSelectedDistrict] = useState("All");
-  const { t } = useLanguage();
+  const [selectedDivisionId, setSelectedDivisionId] = useState("All");
+  const [selectedDistrictId, setSelectedDistrictId] = useState("All");
+  const [selectedAreaId, setSelectedAreaId] = useState("All");
+  const { locale, t } = useLanguage();
+  const isBangla = locale === "bn";
 
-  const districts = useMemo(() => getDistricts(petrolPumps), []);
+  const filteredDistricts = useMemo(
+    () =>
+      districts.filter(
+        (district) =>
+          selectedDivisionId === "All" ||
+          district.parent?.id === selectedDivisionId
+      ),
+    [selectedDivisionId]
+  );
+  const filteredAreas = useMemo(
+    () =>
+      [
+        ...upazilas
+          .filter(
+            (upazila) =>
+              selectedDistrictId === "All" ||
+              upazila.parent?.id === selectedDistrictId
+          )
+          .map((upazila) => ({
+            id: upazila.id,
+            name: isBangla ? upazila.name.local : upazila.name.en,
+            type: "Upazila" as const,
+          })),
+        ...thanas
+          .filter(
+            (thana) =>
+              (selectedDistrictId === "All" ||
+                thana.districtId === selectedDistrictId) &&
+              (selectedDivisionId === "All" ||
+                thana.divisionId === selectedDivisionId)
+          )
+          .map((thana) => ({
+            id: thana.id,
+            name: isBangla ? thana.nameBn : thana.name,
+            type: "Thana" as const,
+            metropolitanArea: thana.metropolitanArea,
+          })),
+      ].sort((a, b) => a.name.localeCompare(b.name)),
+    [isBangla, selectedDistrictId, selectedDivisionId]
+  );
+  const stationsForArea = useMemo(
+    () => (selectedAreaId === "All" ? petrolPumps : getStationsForArea(selectedAreaId)),
+    [selectedAreaId]
+  );
+  const searchAreaIds = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    if (!query) return [];
+
+    return [
+      ...upazilas
+        .filter(
+          (upazila) =>
+            upazila.name.en.toLocaleLowerCase().includes(query) ||
+            upazila.name.local.includes(query)
+        )
+        .map((upazila) => upazila.id),
+      ...thanas
+        .filter(
+          (thana) =>
+            thana.name.toLocaleLowerCase().includes(query) ||
+            thana.nameBn.includes(query)
+        )
+        .map((thana) => thana.id),
+    ];
+  }, [search]);
+  const stationsForSearch = useMemo(() => {
+    if (searchAreaIds.length === 0) return stationsForArea;
+
+    return Array.from(
+      new Map(
+        searchAreaIds
+          .flatMap((areaId) => getStationsForArea(areaId))
+          .map((station) => [station.id, station])
+      ).values()
+    );
+  }, [searchAreaIds, stationsForArea]);
 
   const filteredPumps = useMemo(() => {
-    return petrolPumps.filter((pump) => {
+    return stationsForSearch.filter((pump) => {
       const matchesSearch =
         pump.name.toLowerCase().includes(search.toLowerCase()) ||
         pump.location.toLowerCase().includes(search.toLowerCase()) ||
-        pump.district.toLowerCase().includes(search.toLowerCase());
+        pump.district.toLowerCase().includes(search.toLowerCase()) ||
+        pump.address.toLowerCase().includes(search.toLowerCase());
       const matchesDistrict =
-        selectedDistrict === "All" || pump.district === selectedDistrict;
-      return matchesSearch && matchesDistrict;
+        selectedDistrictId === "All" || pump.districtId === selectedDistrictId;
+      const matchesDivision =
+        selectedDivisionId === "All" || pump.divisionId === selectedDivisionId;
+      const matchesArea =
+        selectedAreaId === "All" ||
+        pump.upazilaId === selectedAreaId ||
+        pump.thanaId === selectedAreaId;
+      return (
+        matchesSearch &&
+        matchesDistrict &&
+        matchesDivision &&
+        matchesArea
+      );
     });
-  }, [search, selectedDistrict]);
+  }, [
+    search,
+    selectedDivisionId,
+    selectedDistrictId,
+    selectedAreaId,
+    stationsForSearch,
+  ]);
 
-  const stats = getStats(petrolPumps);
-
-  // Build the hero description with highlighted words
-  const descParts = t.hero.description.split(/\{petrol\}|\{octane\}/);
-  const heroDescription = (
-    <>
-      {descParts[0]}
-      <span className="text-amber-400 font-medium">{t.hero.petrol}</span>
-      {descParts[1]}
-      <span className="text-amber-400 font-medium">{t.hero.octane}</span>
-      {descParts[2]}
-    </>
-  );
+  const stats = getStats(filteredPumps);
 
   return (
     <div className="bg-animated min-h-screen">
       <div className="relative z-10">
         {/* Header */}
-        <header className="border-b border-white/5">
+        <header className="app-header border-b border-white/5">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -67,7 +171,7 @@ export default function Home() {
                   </svg>
                 </div>
                 <div>
-                  <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+                  <h1 className="brand-title text-lg sm:text-xl font-bold text-white tracking-tight">
                     {t.header.title}{" "}
                     <span className="text-cyan-400">{t.header.highlight}</span>
                   </h1>
@@ -77,6 +181,7 @@ export default function Home() {
                 </div>
               </div>
               <div className="flex items-center gap-2.5">
+                <ThemeSwitcher />
                 <LanguageSwitcher />
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-500/10 border border-red-500/20">
                   <span className="live-dot" style={{ background: "#ff1744" }} />
@@ -91,7 +196,7 @@ export default function Home() {
 
         {/* Hero Section */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-4">
-          <div className="glass-card p-6 sm:p-8 relative overflow-hidden">
+          <div className="hero-card glass-card p-6 sm:p-8 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 to-transparent pointer-events-none" />
             <div className="relative">
               <div className="flex items-center gap-2 mb-3">
@@ -99,11 +204,11 @@ export default function Home() {
                   {t.hero.badge}
                 </span>
               </div>
-              <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
+              <h2 className="hero-title text-xl sm:text-2xl font-bold text-white mb-2">
                 {t.hero.title}
               </h2>
               <p className="text-sm text-slate-400 max-w-2xl leading-relaxed">
-                {heroDescription}
+                {t.hero.description}
               </p>
             </div>
           </div>
@@ -116,7 +221,7 @@ export default function Home() {
               <StatCard
                 title={t.stats.totalStations}
                 value={stats.totalPumps}
-                subtitle={t.stats.currentlyOpen.replace("{count}", String(stats.openPumps))}
+                subtitle={t.stats.currentlyOpen}
                 glowClass="stat-glow-cyan"
                 accentColor="#38bdf8"
                 icon={
@@ -131,7 +236,7 @@ export default function Home() {
             <div className="animate-fade-in-up delay-100">
               <StatCard
                 title={t.stats.avgPetrol}
-                value={`${stats.avgPetrol}%`}
+                value="—"
                 subtitle={t.stats.acrossAll}
                 glowClass="stat-glow-green"
                 accentColor="#00e676"
@@ -145,7 +250,7 @@ export default function Home() {
             <div className="animate-fade-in-up delay-200">
               <StatCard
                 title={t.stats.avgOctane}
-                value={`${stats.avgOctane}%`}
+                value="—"
                 subtitle={t.stats.acrossAll}
                 glowClass="stat-glow-amber"
                 accentColor="#ffab00"
@@ -177,9 +282,9 @@ export default function Home() {
 
         {/* Search & Filters */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+          <div className="filter-panel flex flex-col sm:flex-row gap-3 sm:items-center">
             {/* Search */}
-            <div className="relative flex-1 max-w-md">
+            <div className="search-wrap relative flex-1 max-w-md">
               <svg
                 className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500"
                 width="18"
@@ -202,27 +307,67 @@ export default function Home() {
               />
             </div>
 
-            {/* District filters */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-              <button
-                id="filter-all"
-                className={`filter-chip ${selectedDistrict === "All" ? "active" : ""}`}
-                onClick={() => setSelectedDistrict("All")}
-              >
-                {t.search.all}
-              </button>
-              {districts.map((district) => (
-                <button
-                  key={district}
-                  id={`filter-${district.toLowerCase()}`}
-                  className={`filter-chip ${selectedDistrict === district ? "active" : ""}`}
-                  onClick={() => setSelectedDistrict(district)}
-                >
-                  {district}
-                </button>
+            <select
+              className="filter-select"
+              value={selectedDivisionId}
+              onChange={(event) => {
+                setSelectedDivisionId(event.target.value);
+                setSelectedDistrictId("All");
+                setSelectedAreaId("All");
+              }}
+              aria-label="Filter by division"
+            >
+              <option value="All">{isBangla ? "সব বিভাগ" : "All divisions"}</option>
+              {divisions.map((division) => (
+                <option key={division.id} value={division.id}>
+                  {isBangla ? division.name.local : division.name.en}
+                </option>
               ))}
-            </div>
+            </select>
+            <select
+              className="filter-select"
+              value={selectedDistrictId}
+              onChange={(event) => {
+                setSelectedDistrictId(event.target.value);
+                setSelectedAreaId("All");
+              }}
+              aria-label="Filter by district"
+            >
+              <option value="All">{isBangla ? "সব জেলা" : "All districts"}</option>
+              {filteredDistricts.map((district) => (
+                <option key={district.id} value={district.id}>
+                  {isBangla ? district.name.local : district.name.en}
+                </option>
+              ))}
+            </select>
+            <select
+              className="filter-select"
+              value={selectedAreaId}
+              onChange={(event) => setSelectedAreaId(event.target.value)}
+              aria-label="Filter by thana or upazila"
+            >
+              <option value="All">{isBangla ? "সব থানা" : "All thanas"}</option>
+              {filteredAreas.map((area) => (
+                <option key={area.id} value={area.id}>
+                  {isBangla
+                    ? `${area.type === "Thana" ? "থানা" : "উপজেলা"}: ${area.name}`
+                    : `${area.type}: ${area.name}`}
+                  {area.type === "Thana"
+                    ? ` (${
+                        isBangla
+                          ? metropolitanAreaNamesBn[area.metropolitanArea]
+                          : area.metropolitanArea.replace(" Metropolitan Police", "")
+                      })`
+                    : ""}
+                </option>
+              ))}
+            </select>
           </div>
+          <p className="text-xs text-slate-500 mt-3">
+            Administrative coverage: {divisions.length} divisions, {districts.length} districts,{" "}
+            {upazilas.length} upazilas and {thanas.length} metropolitan thanas. The
+            combined thana list includes both types.
+          </p>
         </section>
 
         {/* Pump Grid */}

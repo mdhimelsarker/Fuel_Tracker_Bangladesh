@@ -1,248 +1,307 @@
-export type FuelStatus = "available" | "limited" | "critical" | "empty";
+import divisionsData from "@/data/divisions.json";
+import districtsData from "@/data/districts.json";
+import upazilasData from "@/data/upazilas.json";
+
+export type VerificationStatus = "verified" | "partially-verified" | "unverified";
+export type FuelType = "Petrol" | "Octane" | "Diesel" | "CNG" | "LPG";
+
+type AdministrativeRecord = {
+  id: string;
+  name: { en: string; local: string; slug: string };
+  parent: { id: string; name: { en: string } } | null;
+  ancestors: Array<{ id: string; name: { en: string } }>;
+  geo?: { lat?: string; lon?: string };
+};
+
+export type Division = AdministrativeRecord & { level: 1 };
+export type District = AdministrativeRecord & { level: 2 };
+export type Upazila = AdministrativeRecord & { level: 3 };
+
+export interface Thana {
+  id: string;
+  name: string;
+  nameBn: string;
+  districtId: string;
+  divisionId: string;
+  metropolitanArea: string;
+  scope: "metropolitan-reference";
+  source: string;
+}
 
 export interface PetrolPump {
   id: string;
   name: string;
-  location: string;
+  divisionId: string;
+  division: string;
+  districtId: string;
   district: string;
-  petrolLevel: number; // 0-100 percentage
-  octaneLevel: number; // 0-100 percentage
-  dieselLevel: number; // 0-100 percentage
-  lastUpdated: string; // ISO timestamp
-  isOpen: boolean;
-  latitude: number;
-  longitude: number;
-  contact: string;
+  upazilaId?: string;
+  upazila?: string;
+  thanaId?: string;
+  thana?: string;
+  address: string;
+  location: string;
+  latitude?: number;
+  longitude?: number;
+  fuelTypes: FuelType[];
+  contact?: string;
+  operatingHours?: string;
+  source: string;
+  verificationStatus: VerificationStatus;
+  lastVerified?: string;
+  isOpen?: boolean;
+  lastUpdated?: string;
+  petrolLevel?: number;
+  octaneLevel?: number;
+  dieselLevel?: number;
+  isDemo?: boolean;
 }
 
-export function getFuelStatus(level: number): FuelStatus {
+export const divisions = divisionsData as Division[];
+export const districts = districtsData as District[];
+export const upazilas = upazilasData as Upazila[];
+
+const metropolitanThanaGroups: Array<{
+  area: string;
+  districtId: string;
+  divisionId: string;
+  source: string;
+  names: string[];
+}> = [
+  {
+    area: "Dhaka Metropolitan Police",
+    districtId: "BD3026",
+    divisionId: "BD30",
+    source: "https://www.police.gov.bd/en/dhaka_metropolitan_police",
+    names: [
+      "Adabor", "Airport", "Badda", "Banani", "Bangshal", "Bhashantek",
+      "Cantonment", "Chackbazar", "Darus Salam", "Daskhinkhan", "Demra",
+      "Dhanmondi", "Gandaria", "Gulshan", "Hazaribagh", "Jatrabari",
+      "Kadamtali", "Kafrul", "Kalabagan", "Kamrangirchar", "Khilgaon",
+      "Khilkhet", "Kotwali", "Lalbagh", "Mirpur Model", "Mohammadpur",
+      "Motijheel", "Mugda", "New Market", "Pallabi", "Paltan Model",
+      "Ramna Model", "Rampura", "Rupnagar", "Sabujbag", "Shah Ali",
+      "Shahbag", "Sher-e-Bangla Nagar", "Shyampur", "Sutrapur",
+      "Shahjahanpur", "Tejgaon", "Tejgaon Industrial Area", "Turag",
+      "Uttara Model", "Uttarkhan", "Uttara West", "Vatara", "Wari",
+    ],
+  },
+  {
+    area: "Chattogram Metropolitan Police",
+    districtId: "BD2015",
+    divisionId: "BD20",
+    source: "https://www.police.gov.bd/en/chittagong_metropolitan_police",
+    names: [
+      "Kotwali", "Chandgaon", "Panchlaish", "Double Mooring", "Pahartali",
+      "Bandar", "Baizid Bostami", "Halishahar", "Karnafuli", "Patenga",
+      "Bakalia", "Akbar Shah", "Sadarghat", "EPZ", "Chawkbazar", "Khulshi",
+    ],
+  },
+  {
+    area: "Khulna Metropolitan Police",
+    districtId: "BD4047",
+    divisionId: "BD40",
+    source: "https://www.police.gov.bd/en/khulna_metropolitan_police",
+    names: ["Khulna", "Sonadanga", "Khalishpur", "Daulatpur", "Khanjahan Ali"],
+  },
+  {
+    area: "Rajshahi Metropolitan Police",
+    districtId: "BD5081",
+    divisionId: "BD50",
+    source: "https://www.police.gov.bd/en/rajshahi_metropolitan_police",
+    names: [
+      "Boalia",
+      "Rajpara",
+      "Shah Makhdum",
+      "Motihar",
+      "Kashiadanga",
+      "Chandrima",
+    ],
+  },
+  {
+    area: "Sylhet Metropolitan Police",
+    districtId: "BD6091",
+    divisionId: "BD60",
+    source: "https://www.police.gov.bd/en/sylhet_metropolitan_police",
+    names: ["Kotwali", "Jalalabad", "Shahporan", "Airport", "Moglabazar", "Dakshin Surma"],
+  },
+  {
+    area: "Barishal Metropolitan Police",
+    districtId: "BD1006",
+    divisionId: "BD10",
+    source: "https://www.police.gov.bd/en/barisal_metropolitan_police",
+    names: ["Kotwali", "Airport", "Kawnia", "Bandar", "Rupatali", "University", "Char Monai", "Kashipur"],
+  },
+  {
+    area: "Rangpur Metropolitan Police",
+    districtId: "BD5585",
+    divisionId: "BD55",
+    source: "https://www.police.gov.bd/en/rangpur_metropolitan_police",
+    names: ["Kotwali", "Haragachh", "Tajhat", "Mahiganj"],
+  },
+  {
+    area: "Gazipur Metropolitan Police",
+    districtId: "BD3033",
+    divisionId: "BD30",
+    source: "https://www.police.gov.bd/en/gazipur_metropolitan_police",
+    names: ["Joydebpur", "Tongi East", "Tongi West", "Kashimpur", "Bason", "Gachha", "Konabari"],
+  },
+];
+
+const thanaNamesBn: Record<string, string> = {
+  Adabor: "আদাবর", Airport: "বিমানবন্দর", Badda: "বাড্ডা", Banani: "বনানী",
+  Bangshal: "বংশাল", Bhashantek: "ভাসানটেক", Cantonment: "ক্যান্টনমেন্ট",
+  Chackbazar: "চকবাজার", "Darus Salam": "দারুস সালাম", Daskhinkhan: "দক্ষিণখান",
+  Demra: "ডেমরা", Dhanmondi: "ধানমন্ডি", Gandaria: "গেন্ডারিয়া", Gulshan: "গুলশান",
+  Hazaribagh: "হাজারীবাগ", Jatrabari: "যাত্রাবাড়ী", Kadamtali: "কদমতলী",
+  Kafrul: "কাফরুল", Kalabagan: "কলাবাগান", Kamrangirchar: "কামরাঙ্গীরচর",
+  Khilgaon: "খিলগাঁও", Khilkhet: "খিলক্ষেত", Kotwali: "কোতোয়ালি",
+  Lalbagh: "লালবাগ", "Mirpur Model": "মিরপুর মডেল", Mohammadpur: "মোহাম্মদপুর",
+  Motijheel: "মতিঝিল", Mugda: "মুগদা", "New Market": "নিউ মার্কেট",
+  Pallabi: "পল্লবী", "Paltan Model": "পল্টন মডেল", "Ramna Model": "রমনা মডেল",
+  Rampura: "রামপুরা", Rupnagar: "রূপনগর", Sabujbag: "সবুজবাগ", "Shah Ali": "শাহ আলী",
+  Shahbag: "শাহবাগ", "Sher-e-Bangla Nagar": "শেরেবাংলা নগর", Shyampur: "শ্যামপুর",
+  Sutrapur: "সূত্রাপুর", Shahjahanpur: "শাহজাহানপুর", Tejgaon: "তেজগাঁও",
+  "Tejgaon Industrial Area": "তেজগাঁও শিল্পাঞ্চল", Turag: "তুরাগ",
+  "Uttara Model": "উত্তরা মডেল", Uttarkhan: "উত্তরখান", "Uttara West": "উত্তরা পশ্চিম",
+  Vatara: "ভাটারা", Wari: "ওয়ারী", Chandgaon: "চাঁদগাঁও", Panchlaish: "পাঁচলাইশ",
+  "Double Mooring": "ডবলমুরিং", Pahartali: "পাহাড়তলী", Bandar: "বন্দর",
+  "Baizid Bostami": "বায়েজিদ বোস্তামী", Halishahar: "হালিশহর", Karnafuli: "কর্ণফুলী",
+  Patenga: "পতেঙ্গা", Bakalia: "বাকলিয়া", "Akbar Shah": "আকবর শাহ",
+  Sadarghat: "সদরঘাট", EPZ: "ইপিজেড", Chawkbazar: "চকবাজার", Khulshi: "খুলশী",
+  Khulna: "খুলনা", Sonadanga: "সোনাডাঙ্গা", Khalishpur: "খালিশপুর",
+  Daulatpur: "দৌলতপুর", "Khanjahan Ali": "খানজাহান আলী", Boalia: "বোয়ালিয়া",
+  Rajpara: "রাজপাড়া", Motihar: "মতিহার", "Shah Makhdum": "শাহ মখদুম",
+  Kashiadanga: "কাশিয়াডাঙ্গা", Chandrima: "চন্দ্রিমা",
+  Jalalabad: "জালালাবাদ", Shahporan: "শাহপরান", Moglabazar: "মোগলাবাজার",
+  "Dakshin Surma": "দক্ষিণ সুরমা", Kawnia: "কাউনিয়া", Rupatali: "রূপাতলী",
+  University: "বিশ্ববিদ্যালয়", "Char Monai": "চর মোনাই", Kashipur: "কাশীপুর",
+  Haragachh: "হারাগাছ", Tajhat: "তাজহাট", Mahiganj: "মাহিগঞ্জ",
+  Joydebpur: "জয়দেবপুর", "Tongi East": "টঙ্গী পূর্ব", "Tongi West": "টঙ্গী পশ্চিম",
+  Kashimpur: "কাশিমপুর", Bason: "বাসন", Gachha: "গাছা", Konabari: "কোনাবাড়ী",
+};
+
+export const thanas: Thana[] = metropolitanThanaGroups.flatMap((group) =>
+  group.names.map((name) => ({
+    id: `thana-${group.districtId.toLowerCase()}-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+    name,
+    nameBn: thanaNamesBn[name] ?? name,
+    districtId: group.districtId,
+    divisionId: group.divisionId,
+    metropolitanArea: group.area,
+    scope: "metropolitan-reference" as const,
+    source: group.source,
+  }))
+);
+
+function createStationsForArea(areaId: string): PetrolPump[] {
+  const upazila = upazilas.find((item) => item.id === areaId);
+  const thana = thanas.find((item) => item.id === areaId);
+
+  if (!upazila && !thana) return [];
+
+  const districtId = upazila?.parent?.id ?? thana?.districtId;
+  const district = districts.find((item) => item.id === districtId);
+  const divisionId = thana?.divisionId ?? district?.parent?.id;
+  const division = divisions.find((item) => item.id === divisionId);
+  const areaName = upazila?.name.en ?? thana?.name ?? "Local";
+
+  return Array.from({ length: 5 }, (_, index) => ({
+    id: `demo-station-${areaId.toLowerCase()}-${index + 1}`,
+    name: `${areaName} Fuel Station ${String(index + 1).padStart(2, "0")}`,
+    divisionId: divisionId ?? "",
+    division: division?.name.en ?? "",
+    districtId: districtId ?? "",
+    district: district?.name.en ?? "",
+    ...(upazila
+      ? { upazilaId: upazila.id, upazila: upazila.name.en }
+      : { thanaId: thana?.id, thana: thana?.name }),
+    address: `${areaName}, ${district?.name.en ?? "Bangladesh"}`,
+    location: `${areaName}, ${district?.name.en ?? "Bangladesh"}`,
+    fuelTypes: [] as FuelType[],
+    source: "internal-demo-record",
+    verificationStatus: "unverified" as const,
+    isDemo: true,
+  }));
+}
+
+const areaIds = [
+  ...upazilas.map((upazila) => upazila.id),
+  ...thanas.map((thana) => thana.id),
+];
+
+export const petrolPumps: PetrolPump[] = areaIds.flatMap(createStationsForArea);
+
+export function getStationsForArea(areaId: string): PetrolPump[] {
+  return petrolPumps.filter(
+    (station) => station.upazilaId === areaId || station.thanaId === areaId
+  );
+}
+
+export function validateStationData(stations: PetrolPump[]): string[] {
+  const errors: string[] = [];
+  const ids = new Set<string>();
+  const divisionIds = new Set(divisions.map((division) => division.id));
+  const districtIds = new Set(districts.map((district) => district.id));
+  const upazilaIds = new Set(upazilas.map((upazila) => upazila.id));
+  const thanaIds = new Set(thanas.map((thana) => thana.id));
+
+  for (const station of stations) {
+    if (ids.has(station.id)) errors.push(`Duplicate station ID: ${station.id}`);
+    ids.add(station.id);
+    if (!station.name.trim() || !station.address.trim() || !station.source.trim()) {
+      errors.push(`Missing required station field: ${station.id}`);
+    }
+    if (!divisionIds.has(station.divisionId) || !districtIds.has(station.districtId)) {
+      errors.push(`Invalid administrative parent: ${station.id}`);
+    }
+    if (station.upazilaId && !upazilaIds.has(station.upazilaId)) {
+      errors.push(`Invalid upazila parent: ${station.id}`);
+    }
+    if (station.thanaId && !thanaIds.has(station.thanaId)) {
+      errors.push(`Invalid thana parent: ${station.id}`);
+    }
+    if (
+      station.latitude !== undefined &&
+      station.longitude !== undefined &&
+      (station.latitude < -90 ||
+        station.latitude > 90 ||
+        station.longitude < -180 ||
+        station.longitude > 180)
+    ) {
+      errors.push(`Invalid coordinates: ${station.id}`);
+    }
+  }
+  return errors;
+}
+
+export function getFuelStatus(level: number) {
   if (level >= 60) return "available";
   if (level >= 30) return "limited";
   if (level > 0) return "critical";
   return "empty";
 }
 
-export function getStatusColor(status: FuelStatus): string {
+export function getStatusColor(status: "available" | "limited" | "critical" | "empty") {
   switch (status) {
-    case "available":
-      return "#00e676";
-    case "limited":
-      return "#ffab00";
-    case "critical":
-      return "#ff1744";
-    case "empty":
-      return "#616161";
+    case "available": return "#00e676";
+    case "limited": return "#ffab00";
+    case "critical": return "#ff1744";
+    case "empty": return "#616161";
   }
 }
 
-export function getStatusLabel(status: FuelStatus): string {
-  switch (status) {
-    case "available":
-      return "Available";
-    case "limited":
-      return "Limited";
-    case "critical":
-      return "Critical";
-    case "empty":
-      return "Out of Stock";
-  }
+export function getStats(stations: PetrolPump[]) {
+  return {
+    totalPumps: stations.length,
+    openPumps: null,
+    avgPetrol: 0,
+    avgOctane: 0,
+    avgDiesel: 0,
+    criticalPumps: 0,
+  };
 }
 
-// Simulated live data for petrol pumps across Bangladesh
-export const petrolPumps: PetrolPump[] = [
-  {
-    id: "pump-001",
-    name: "Padma Fuel Station",
-    location: "Mirpur-10, Dhaka",
-    district: "Dhaka",
-    petrolLevel: 72,
-    octaneLevel: 45,
-    dieselLevel: 88,
-    lastUpdated: "2026-03-24T22:30:00+06:00",
-    isOpen: true,
-    latitude: 23.8069,
-    longitude: 90.3687,
-    contact: "01711-XXXXXX",
-  },
-  {
-    id: "pump-002",
-    name: "Meghna Petroleum",
-    location: "Gulshan-2, Dhaka",
-    district: "Dhaka",
-    petrolLevel: 15,
-    octaneLevel: 8,
-    dieselLevel: 42,
-    lastUpdated: "2026-03-24T22:15:00+06:00",
-    isOpen: true,
-    latitude: 23.7934,
-    longitude: 90.4145,
-    contact: "01812-XXXXXX",
-  },
-  {
-    id: "pump-003",
-    name: "Jamuna Auto Fuel",
-    location: "Dhanmondi-27, Dhaka",
-    district: "Dhaka",
-    petrolLevel: 0,
-    octaneLevel: 0,
-    dieselLevel: 22,
-    lastUpdated: "2026-03-24T21:45:00+06:00",
-    isOpen: false,
-    latitude: 23.7465,
-    longitude: 90.3756,
-    contact: "01911-XXXXXX",
-  },
-  {
-    id: "pump-004",
-    name: "Natore City Filling Station",
-    location: "Station Road, Natore",
-    district: "Natore",
-    petrolLevel: 55,
-    octaneLevel: 30,
-    dieselLevel: 65,
-    lastUpdated: "2026-03-24T22:00:00+06:00",
-    isOpen: true,
-    latitude: 24.4102,
-    longitude: 88.9326,
-    contact: "01611-XXXXXX",
-  },
-  {
-    id: "pump-005",
-    name: "Rajshahi Central Petroleum",
-    location: "Shaheb Bazaar, Rajshahi",
-    district: "Rajshahi",
-    petrolLevel: 38,
-    octaneLevel: 12,
-    dieselLevel: 50,
-    lastUpdated: "2026-03-24T22:10:00+06:00",
-    isOpen: true,
-    latitude: 24.3745,
-    longitude: 88.6042,
-    contact: "01511-XXXXXX",
-  },
-  {
-    id: "pump-006",
-    name: "Chittagong Port Fuel Depot",
-    location: "Agrabad, Chittagong",
-    district: "Chittagong",
-    petrolLevel: 82,
-    octaneLevel: 60,
-    dieselLevel: 91,
-    lastUpdated: "2026-03-24T22:25:00+06:00",
-    isOpen: true,
-    latitude: 22.3264,
-    longitude: 91.8039,
-    contact: "01311-XXXXXX",
-  },
-  {
-    id: "pump-007",
-    name: "Sylhet Green Fuel",
-    location: "Zindabazar, Sylhet",
-    district: "Sylhet",
-    petrolLevel: 5,
-    octaneLevel: 0,
-    dieselLevel: 18,
-    lastUpdated: "2026-03-24T21:55:00+06:00",
-    isOpen: true,
-    latitude: 24.8949,
-    longitude: 91.8687,
-    contact: "01411-XXXXXX",
-  },
-  {
-    id: "pump-008",
-    name: "Khulna Industrial Fuel",
-    location: "Boyra, Khulna",
-    district: "Khulna",
-    petrolLevel: 48,
-    octaneLevel: 25,
-    dieselLevel: 60,
-    lastUpdated: "2026-03-24T22:05:00+06:00",
-    isOpen: true,
-    latitude: 22.8456,
-    longitude: 89.5403,
-    contact: "01711-YYYYYY",
-  },
-  {
-    id: "pump-009",
-    name: "Comilla Junction Petroleum",
-    location: "Kandirpar, Comilla",
-    district: "Comilla",
-    petrolLevel: 28,
-    octaneLevel: 18,
-    dieselLevel: 35,
-    lastUpdated: "2026-03-24T22:20:00+06:00",
-    isOpen: true,
-    latitude: 23.4607,
-    longitude: 91.1809,
-    contact: "01812-YYYYYY",
-  },
-  {
-    id: "pump-010",
-    name: "Bogra Express Fuel",
-    location: "Satmatha, Bogra",
-    district: "Bogra",
-    petrolLevel: 0,
-    octaneLevel: 3,
-    dieselLevel: 10,
-    lastUpdated: "2026-03-24T21:30:00+06:00",
-    isOpen: false,
-    latitude: 24.8465,
-    longitude: 89.3773,
-    contact: "01911-YYYYYY",
-  },
-  {
-    id: "pump-011",
-    name: "Natore Bypass Fuel Point",
-    location: "Dhaka-Rajshahi Highway, Natore",
-    district: "Natore",
-    petrolLevel: 35,
-    octaneLevel: 20,
-    dieselLevel: 45,
-    lastUpdated: "2026-03-24T22:12:00+06:00",
-    isOpen: true,
-    latitude: 24.4200,
-    longitude: 88.9450,
-    contact: "01611-ZZZZZZ",
-  },
-  {
-    id: "pump-012",
-    name: "Barishal River Port Petroleum",
-    location: "Sadar Road, Barishal",
-    district: "Barishal",
-    petrolLevel: 62,
-    octaneLevel: 40,
-    dieselLevel: 75,
-    lastUpdated: "2026-03-24T22:18:00+06:00",
-    isOpen: true,
-    latitude: 22.701,
-    longitude: 90.3535,
-    contact: "01511-ZZZZZZ",
-  },
-];
-
-// Aggregate statistics
-export function getStats(pumps: PetrolPump[]) {
-  const totalPumps = pumps.length;
-  const openPumps = pumps.filter((p) => p.isOpen).length;
-  const avgPetrol = Math.round(
-    pumps.reduce((s, p) => s + p.petrolLevel, 0) / totalPumps
-  );
-  const avgOctane = Math.round(
-    pumps.reduce((s, p) => s + p.octaneLevel, 0) / totalPumps
-  );
-  const avgDiesel = Math.round(
-    pumps.reduce((s, p) => s + p.dieselLevel, 0) / totalPumps
-  );
-  const criticalPumps = pumps.filter(
-    (p) =>
-      getFuelStatus(p.petrolLevel) === "critical" ||
-      getFuelStatus(p.petrolLevel) === "empty"
-  ).length;
-
-  return { totalPumps, openPumps, avgPetrol, avgOctane, avgDiesel, criticalPumps };
-}
-
-// Get unique districts
-export function getDistricts(pumps: PetrolPump[]): string[] {
-  return [...new Set(pumps.map((p) => p.district))].sort();
+export function getDistricts(stations: PetrolPump[]): string[] {
+  return [...new Set(stations.map((station) => station.district))].sort();
 }
